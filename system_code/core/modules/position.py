@@ -27,6 +27,7 @@ class HoldingPeriod:
         self.exit_price = None  # 出场价格，未平仓时为 None
         self.leverage = leverage
         self.fee_rate = 0.005  # 手续费费率（可以在平仓时计算）
+        self.more_info = {}     # 用于存储额外信息
 
         # 计算时初始化
         self.final_profit = None  # 最终收益（平仓后计算）
