@@ -55,6 +55,7 @@ class Backtest:
                 event.append((hp.end, -1))
             event.sort(key=lambda x: x[0])
             max_overlap = np.max(np.cumsum([x[1] for x in event]))
+            mean_overlap = np.mean([x[1] for x in event])
 
             final_profits_compound = [1 + hp.final_profit for hp in non_overlapping_holdings]
             self.profits_compound = final_profits_compound
@@ -217,6 +218,7 @@ class Backtest:
                 'final_return_compound': final_return_compound,
                 'final_return_fee': final_return_fee,
                 'max_overlap': max_overlap,
+                'mean_overlap': mean_overlap,
                 'final_return_compound_fee': final_return_compound_fee,
                 'average_daily_return': average_daily_return,
                 'average_monthly_return': average_monthly_return,
