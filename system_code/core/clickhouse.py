@@ -75,6 +75,13 @@ class CKClient:
         sql = "select * from instruments_info"
         return  self.query_dataframe(sql)
 
+    def fetch_data(self, inst_id, begin: datetime, end: datetime) -> pd.DataFrame:
+        begin_ts = int(begin.timestamp() * 1000)
+        end_ts = int(end.timestamp() * 1000)
+        sql = f"select * from candles where ts >= {begin_ts} and ts < {end_ts}"
+
+        return self.query_dataframe(sql)
+
 
 if __name__ == '__main__':
     ck = CKClient()
