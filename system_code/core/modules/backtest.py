@@ -29,13 +29,13 @@ class Backtest:
         """
         results = []
 
-        for holding_group in holding_groups:
+        for idx, holding_group in enumerate(holding_groups):
             # 对每个HoldingGroup对象的HoldingPeriod对象进行排序
             holding_group.holdings = sorted(holding_group.holdings, key=lambda x: x.begin)
 
             # 1. 固定仓位最终收益率
             final_profits = [hp.final_profit for hp in holding_group.holdings]
-            self.profits = final_profits
+            self.profits.append(final_profits)
             final_return = np.sum(final_profits)
 
             # 1.1 复利收益率
@@ -55,20 +55,21 @@ class Backtest:
                 event.append((hp.end, -1))
             event.sort(key=lambda x: x[0])
             max_overlap = np.max(np.cumsum([x[1] for x in event]))
-            mean_overlap = np.mean([x[1] for x in event])
+            # 去除所有0值后的平均值
+            mean_overlap = np.mean(np.cumsum([x[1] for x in event]))
 
             final_profits_compound = [1 + hp.final_profit for hp in non_overlapping_holdings]
-            self.profits_compound = final_profits_compound
+            self.profits_compound.append(final_profits_compound)
             final_return_compound = np.prod(final_profits_compound) - 1
 
             # 1.2.1 带手续费的收益率
             final_profits_fee = [hp.final_profit_fee for hp in holding_group.holdings]
-            self.profits_fee = final_profits_fee
+            self.profits_fee.append(final_profits_fee)
             final_return_fee = np.sum(final_profits_fee)
 
             # 1.2.2 复利带手续费的收益率
             final_profits_compound_fee = [1 + hp.final_profit_fee for hp in non_overlapping_holdings]
-            self.profits_compound_fee = final_profits_compound_fee
+            self.profits_compound_fee.append(final_profits_compound_fee)
             final_return_compound_fee = np.prod(final_profits_compound_fee) - 1
 
             # 2. 平均年，月，日收益
@@ -318,15 +319,15 @@ class Backtest:
         fig.suptitle(f'Sharp ratio: {sharpe_ratio} | Sharp with Btc: {sharpe_ratio_btc}', fontsize=20)
 
         # 1. 固定仓位最终收益率: 固定仓位 带手续费和不带手续费
-        ax[0].plot(np.cumsum(self.profits), label='Fixed Position', color='blue')
-        ax[0].plot(np.cumsum(self.profits_fee), label='Fixed Position with Fee', color='red')
+        ax[0].plot(np.cumsum(self.profits[index]), label='Fixed Position', color='blue')
+        ax[0].plot(np.cumsum(self.profits_fee[index]), label='Fixed Position with Fee', color='red')
         ax[0].set_title(f'Fixed Position | Final Return: {final_return} | Final Return with Fee: {final_return_fee} | '
                         f'Sharpe: {sharpe_ratio} | Sharpe with Btc: {sharpe_ratio_btc}')
         ax[0].legend()
 
         # 2. 复利收益率: 复利 带手续费和不带手续费
-        ax[1].plot(np.cumprod(self.profits_compound) - 1, label='Compound', color='blue')
-        ax[1].plot(np.cumprod(self.profits_compound_fee) - 1, label='Compound with Fee', color='red')
+        ax[1].plot(np.cumprod(self.profits_compound[index]) - 1, label='Compound', color='blue')
+        ax[1].plot(np.cumprod(self.profits_compound_fee[index]) - 1, label='Compound with Fee', color='red')
         ax[1].set_title(f'Compound | Final Return: {final_return_compound} | Final Return with Fee: {final_return_compound_fee} | '
                         f'Sharpe: {sharpe_ratio_compound} | Sharpe with Btc: {sharpe_ratio_btc_compound}')
         ax[1].legend()
