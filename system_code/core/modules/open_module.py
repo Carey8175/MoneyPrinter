@@ -138,7 +138,7 @@ class BBRsiMaOpenPositionModule(OpenPositionModule):
         sell_signal_indices = data.index[data['sellSignal'] == True].tolist()
 
         for idx in buy_signal_indices:
-            holding_data = data.iloc[idx:idx + max_hold_bars]
+            holding_data = data.iloc[idx+1:idx + max_hold_bars]
             holding_period = HoldingPeriod(holding_data, side='long', leverage=leverage)
             holding_group.add(holding_period)
 
