@@ -30,8 +30,12 @@ class PrintSystem:
 
     def fetch_data(self):
         data = self.ck_client.fetch_data(self.inst_id, self.begin, self.end)
+        indicators = self.ck_client.fetch_data(self.inst_id, self.begin, self.end, table='indicators')
         # sort
         data = data.sort_values('ts')
+        indicators = indicators.sort_values('ts')
+
+        data = data.merge(indicators, on='ts', how='left')
 
         return data
 
