@@ -78,7 +78,7 @@ class CKClient:
     def fetch_data(self, inst_id, begin: datetime, end: datetime) -> pd.DataFrame:
         begin_ts = int(begin.timestamp() * 1000)
         end_ts = int(end.timestamp() * 1000)
-        sql = f"select * from candles where ts >= {begin_ts} and ts < {end_ts}"
+        sql = f"select * from candles where ts >= {begin_ts} and ts < {end_ts} and inst_id = '{inst_id}'"
 
         return self.query_dataframe(sql)
 

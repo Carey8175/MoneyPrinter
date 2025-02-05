@@ -8,8 +8,7 @@ from system_code.core.clickhouse import CKClient, logger
 
 
 class Backtest:
-    def __init__(self, investment, fee_rate, bar):
-        self.investment = investment
+    def __init__(self, bar, fee_rate=0.0005):
         self.fee_rate = fee_rate
         self.bar = bar
         self.results = None
@@ -54,12 +53,12 @@ class Backtest:
             final_return_compound = np.prod(final_profits_compound) - 1
 
             # 1.2.1 带手续费的收益率
-            final_profits_fee = [1 + hp.final_profit - self.fee_rate * 2 for hp in holding_group.holdings]
+            final_profits_fee = [hp.final_profit_fee for hp in holding_group.holdings]
             self.profits_fee = final_profits_fee
-            final_return_fee = final_return - self.fee_rate * len(holding_group) * 2
+            final_return_fee = np.sum(final_profits_fee)
 
             # 1.2.2 复利带手续费的收益率
-            final_profits_compound_fee = [1 + hp.final_profit - self.fee_rate * 2 for hp in non_overlapping_holdings]
+            final_profits_compound_fee = [1 + hp.final_profit_fee for hp in non_overlapping_holdings]
             self.profits_compound_fee = final_profits_compound_fee
             final_return_compound_fee = np.prod(final_profits_compound_fee) - 1
 
@@ -70,6 +69,21 @@ class Backtest:
             average_daily_return = final_return / total_days
             average_monthly_return = final_return / total_months
             average_yearly_return = final_return / total_years
+
+            # 2.1 复利平均年，月，日收益
+            average_daily_return_compound = final_return_compound / total_days
+            average_monthly_return_compound = final_return_compound / total_months
+            average_yearly_return_compound = final_return_compound / total_years
+
+            # 2.2 复利平均年，月，日收益带手续费
+            average_daily_return_fee = final_return_fee / total_days
+            average_monthly_return_fee = final_return_fee / total_months
+            average_yearly_return_fee = final_return_fee / total_years
+
+            # 2.3 复利平均年，月，日收益带手续费
+            average_daily_return_compound_fee = final_return_compound_fee / total_days
+            average_monthly_return_compound_fee = final_return_compound_fee / total_months
+            average_yearly_return_compound_fee = final_return_compound_fee / total_years
 
             # 3. 最大回撤
             max_drawdown = 0
@@ -93,6 +107,28 @@ class Backtest:
                 if drawdown > max_drawdown_compound:
                     max_drawdown_compound = drawdown
 
+            # 3.2 复利最大回撤带手续费
+            max_drawdown_compound_fee = 0
+            cumulative_returns_compound_fee = np.cumprod(final_profits_compound_fee) - 1
+            peak = cumulative_returns_compound_fee[0]
+            for r in cumulative_returns_compound_fee:
+                if r > peak:
+                    peak = r
+                drawdown = (peak - r) / peak if peak != 0 else 0
+                if drawdown > max_drawdown_compound_fee:
+                    max_drawdown_compound_fee = drawdown
+
+            # 3.3  固定最大回撤带手续费
+            max_drawdown_fee = 0
+            cumulative_returns_fee = np.cumsum(final_profits_fee)
+            peak = cumulative_returns_fee[0]
+            for r in cumulative_returns_fee:
+                if r > peak:
+                    peak = r
+                drawdown = (peak - r) / peak if peak != 0 else 0
+                if drawdown > max_drawdown_fee:
+                    max_drawdown_fee = drawdown
+
             # 4. 所有仓位的平均收益率，平均最大浮盈，平均最大浮亏，平均最终收益与平均最大浮亏比
             average_final_profit = np.mean(final_profits)
             average_max_unrealized_profit = np.mean([hp.max_unrealized_profit for hp in holding_group.holdings])
@@ -101,27 +137,27 @@ class Backtest:
 
             # 5. 夏普比率 和对应时期的BTC大盘作为对比
             risk_free_rate = 0.02  # 假设无风险利率为2%
-            sharpe_ratio = (final_return - risk_free_rate) / np.std(final_profits) if np.std(final_profits) != 0 else 0
+            sharpe_ratio = (final_return_fee - risk_free_rate) / np.std(final_profits_fee) if np.std(final_profits) != 0 else 0
 
             # 5.1 复利夏普比率
-            sharpe_ratio_compound = (final_return_compound - risk_free_rate) / np.std(final_profits_compound) if np.std(final_profits_compound) != 0 else 0
+            sharpe_ratio_compound = (final_return_compound_fee - risk_free_rate) / np.std(final_profits_compound_fee) if np.std(final_profits_compound) != 0 else 0
 
             # 5.2.1 针对BTC大盘的夏普比率
             btc_profit = self.get_btc_profit(holding_group.begin, holding_group.end)
             if btc_profit == -1:
                 sharpe_ratio_btc = -100
             else:
-                sharpe_ratio_btc = (final_return - btc_profit) / np.std(final_profits) if np.std(final_profits) != 0 else 0
+                sharpe_ratio_btc = (final_return_fee - btc_profit) / np.std(final_profits_fee) if np.std(final_profits) != 0 else 0
 
             # 5.2.2 复利btc夏普比率
             if btc_profit == -1:
                 sharpe_ratio_btc_compound = -100
             else:
-                sharpe_ratio_btc_compound = (final_return_compound - btc_profit) / np.std(final_profits_compound) if np.std(final_profits_compound) != 0 else 0
+                sharpe_ratio_btc_compound = (final_return_compound_fee - btc_profit) / np.std(final_profits_compound_fee) if np.std(final_profits_compound) != 0 else 0
 
             # 6. 所有仓位的胜率，盈亏比
-            winning_trades = sum([1 for hp in holding_group.holdings if hp.final_profit > 0])
-            losing_trades = sum([1 for hp in holding_group.holdings if hp.final_profit < 0])
+            winning_trades = sum([1 for hp in holding_group.holdings if hp.final_profit_fee > 0])
+            losing_trades = sum([1 for hp in holding_group.holdings if hp.final_profit_fee < 0])
             win_rate = winning_trades / len(holding_group) if len(holding_group) != 0 else 0
             profit_loss_ratio_trades = sum([hp.final_profit for hp in holding_group.holdings if hp.final_profit > 0]) / abs(
                 sum([hp.final_profit for hp in holding_group.holdings if hp.final_profit < 0])) if losing_trades != 0 else 0
@@ -131,14 +167,17 @@ class Backtest:
             trade_count = len(holding_group)
 
             # 8. 最长持仓时间
-            holding_times = [(hp.end - hp.begin).days for hp in holding_group.holdings]
+            holding_times = [(hp.end - hp.begin).seconds for hp in holding_group.holdings]
             max_holding_time = max(holding_times) if holding_times else 0
+            max_holding_time = max_holding_time / 60 / 60  # 转换为小时
 
             # 9. 最短持仓时间
             min_holding_time = min(holding_times) if holding_times else 0
+            min_holding_time = min_holding_time / 60 / 60  # 转换为小时
 
             # 10. 平均持仓时间
             average_holding_time = np.mean(holding_times) if holding_times else 0
+            average_holding_time = average_holding_time / 60 / 60  # 转换为小时
 
             # 11. 盈利次数
             winning_count = winning_trades
@@ -147,23 +186,23 @@ class Backtest:
             losing_count = losing_trades
 
             # 13. 最大单笔盈利
-            max_single_profit = max(final_profits) if final_profits else 0
+            max_single_profit = max(final_profits_fee) if final_profits_fee else 0
 
             # 14. 最大单笔亏损
-            max_single_loss = min(final_profits) if final_profits else 0
+            max_single_loss = min(final_profits_fee) if final_profits_fee else 0
 
             # 15. 收益波动率
-            volatility = np.std(final_profits)
+            volatility = np.std(final_profits_fee)
 
             # 16. 收益偏度
-            skewness = pd.Series(final_profits).skew()
+            skewness = pd.Series(final_profits_fee).skew()
 
             # 17. 收益峰度
-            kurtosis = pd.Series(final_profits).kurtosis()
+            kurtosis = pd.Series(final_profits_fee).kurtosis()
 
             # 18. 盈利因子
-            profit_factor = sum([hp.final_profit for hp in holding_group if hp.final_profit > 0]) / abs(
-                sum([hp.final_profit for hp in holding_group if hp.final_profit < 0])) if losing_trades != 0 else 0
+            profit_factor = sum([hp.final_profit_fee for hp in holding_group if hp.final_profit_fee > 0]) / abs(
+                sum([hp.final_profit_fee for hp in holding_group if hp.final_profit_fee < 0])) if losing_trades != 0 else 0
 
             results.append({
                 'final_return': final_return,
@@ -173,8 +212,19 @@ class Backtest:
                 'average_daily_return': average_daily_return,
                 'average_monthly_return': average_monthly_return,
                 'average_yearly_return': average_yearly_return,
+                'average_daily_return_compound': average_daily_return_compound,
+                'average_monthly_return_compound': average_monthly_return_compound,
+                'average_yearly_return_compound': average_yearly_return_compound,
+                'average_daily_return_fee': average_daily_return_fee,
+                'average_monthly_return_fee': average_monthly_return_fee,
+                'average_yearly_return_fee': average_yearly_return_fee,
+                'average_daily_return_compound_fee': average_daily_return_compound_fee,
+                'average_monthly_return_compound_fee': average_monthly_return_compound_fee,
+                'average_yearly_return_compound_fee': average_yearly_return_compound_fee,
                 'max_drawdown': max_drawdown,
                 'max_drawdown_compound': max_drawdown_compound,
+                'max_drawdown_fee': max_drawdown_fee,
+                'max_drawdown_compound_fee': max_drawdown_compound_fee,
                 'average_final_profit': average_final_profit,
                 'average_max_unrealized_profit': average_max_unrealized_profit,
                 'average_max_unrealized_loss': average_max_unrealized_loss,
@@ -214,20 +264,26 @@ class Backtest:
             float: BTC大盘的收益率
         """
         ck_client = CKClient(database=f'mc_{self.bar.upper()}')
-        sql = f"select close from candles where inst_id='BTC-USD' and ts>={int(begin.timestamp() * 1000)} and ts<={int(end.timestamp() * 1000)}"
+        sql = f"select ts, close from candles where inst_id='BTC-USDT-SWAP' and ts>={int(begin.timestamp() * 1000)} and ts<={int(end.timestamp() * 1000)}"
         btc_prices = ck_client.query_dataframe(sql)
 
         if btc_prices.empty:
             return -1
 
+        # sort
+        btc_prices = btc_prices.sort_values('ts')
+
         btc_prices = btc_prices['close'].tolist()
         return btc_prices[-1] / btc_prices[0] - 1
 
-    def plot_single(self, index, save=False):
+    def plot_single(self, index, inst_id, begin, end, save=False):
         """
         绘制回测结果图
         Args:
             index: 回测结果的索引
+            inst_id: 合约id
+            begin: 开始时间
+            end: 结束时间
             save: 是否保存图片
 
         Return:
@@ -247,7 +303,7 @@ class Backtest:
         sharpe_ratio_btc = self.results.loc[index, 'sharpe_ratio_btc']
         sharpe_ratio_btc_compound = self.results.loc[index, 'sharpe_ratio_btc_compound']
 
-        fig, ax = plt.subplots(1, 2, figsize=(12, 20))
+        fig, ax = plt.subplots(3, 1, figsize=(12, 20))
         fig.suptitle(f'Sharp ratio: {sharpe_ratio} | Sharp with Btc: {sharpe_ratio_btc}', fontsize=20)
 
         # 1. 固定仓位最终收益率: 固定仓位 带手续费和不带手续费
@@ -264,15 +320,28 @@ class Backtest:
                         f'Sharpe: {sharpe_ratio_compound} | Sharpe with Btc: {sharpe_ratio_btc_compound}')
         ax[1].legend()
 
+        # 3. 价格走势
+        ck_client = CKClient(database=f'mc_{self.bar.upper()}')
+        sql = f"select ts, close from candles where inst_id='{inst_id}' and ts>={int(begin.timestamp() * 1000)} and ts<={int(end.timestamp() * 1000)}"
+        prices = ck_client.query_dataframe(sql)
+        prices = prices.sort_values('ts')['close'].tolist()
+
+        ax[2].plot(prices, label='Price', color='green')
+        ax[2].set_title(f'Price | {inst_id}')
+        ax[2].legend()
+
         if save:
             plt.savefig(f'backtest_{index}.png')
 
         plt.show()
 
-    def plot_all(self, save=False):
+    def plot_all(self, inst_id, begin, end, save=False):
         """
         绘制所有回测结果图
         Args:
+            inst_id: 合约id
+            begin: 开始时间
+            end: 结束时间
             save: 是否保存图片
 
         Return:
@@ -283,7 +352,13 @@ class Backtest:
             return
 
         for i in range(len(self.results)):
-            self.plot_single(i, save)
+            self.plot_single(
+                index=i,
+                inst_id=inst_id,
+                begin=begin,
+                end=end,
+                save=save
+            )
 
 
 

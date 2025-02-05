@@ -10,6 +10,7 @@ class HoldingPeriod:
             data: pd.DataFrame,
             side: str,
             leverage: float = 1.0,
+            fee_rate: float = 0.0005
     ):
         """
         初始化持仓类
@@ -21,18 +22,19 @@ class HoldingPeriod:
         """
         self.begin: datetime | None = None
         self.end: datetime | None = None  # 结束时间，未平仓时为 None
-        self.data = pd.DataFrame()  # 交易数据，可用于存储行情
+        self.data = data  # 交易数据，可用于存储行情
         self.side = side.lower()  # 确保输入是 "long" 或 "short"
         self.entry_price = 0.0
         self.exit_price = None  # 出场价格，未平仓时为 None
         self.leverage = leverage
-        self.fee_rate = 0.005  # 手续费费率（可以在平仓时计算）
+        self.fee_rate = fee_rate  # 手续费费率（可以在平仓时计算）
         self.more_info = {}     # 用于存储额外信息
 
         # 计算时初始化
         self.final_profit = None  # 最终收益（平仓后计算）
         self.max_unrealized_profit = 0.0  # 最大未实现收益
         self.max_unrealized_loss = 0.0  # 最大未实现亏损
+        self.final_profit_fee = None  # 最终收益（扣除手续费）
 
         self.update()
 
@@ -57,12 +59,15 @@ class HoldingPeriod:
         # 收益
         if self.side == "long":
             self.final_profit = self.leverage * ((self.exit_price - self.entry_price) / self.entry_price)
+
             self.max_unrealized_profit = self.leverage * ((high - self.entry_price) / self.entry_price)
             self.max_unrealized_loss = self.leverage * ((low - self.entry_price) / self.entry_price)
         else:
             self.final_profit = self.leverage * ((self.entry_price - self.exit_price) / self.entry_price)
             self.max_unrealized_profit = self.leverage * ((self.entry_price - low) / self.entry_price)
             self.max_unrealized_loss = self.leverage * ((self.entry_price - high) / self.entry_price)
+
+        self.final_profit_fee = (1 - self.fee_rate) * (1 + self.final_profit) * (1 - self.fee_rate) - 1
 
     def to_array(self):
         """
@@ -77,7 +82,7 @@ class HoldingPeriod:
         return torch.tensor(self.to_array(), dtype=torch.float32)
 
     def __repr__(self):
-        return (f"HoldingPeriod(begin={self.begin}, end={self.end}"
+        return (f"HoldingPeriod(begin={self.begin}, end={self.end}, "
                 f"side={self.side}, entry_price={self.entry_price}, exit_price={self.exit_price}, "
                 f"leverage={self.leverage}, final_profit={self.final_profit}, "
                 f"max_unrealized_profit={self.max_unrealized_profit}, max_unrealized_loss={self.max_unrealized_loss})")
@@ -85,7 +90,7 @@ class HoldingPeriod:
 
 class HoldingGroup:
     def __init__(self):
-        self.holdings = []
+        self.holdings: list[HoldingPeriod] = []
         self.begin: datetime | None = None
         self.end: datetime | None = None
 
@@ -103,7 +108,10 @@ class HoldingGroup:
             holding.update()
 
         self.begin = min([holding.begin for holding in self.holdings])
-        self.end = max([holding.end for holding in self.holdings])
+        try:
+            self.end = max([holding.end for holding in self.holdings])
+        except:
+            self.end = max([holding.begin for holding in self.holdings])
 
 
 

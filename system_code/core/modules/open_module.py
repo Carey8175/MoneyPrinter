@@ -23,7 +23,7 @@ class OpenPositionModule:
         # 默认间隔100个测试开仓
         holding_group = HoldingGroup()
 
-        for i in range(0, len(data), 100):
+        for i in range(0, len(data), 1000):
             holding_period = HoldingPeriod(data[i:i + 100], 'long', leverage)
             holding_group.add(holding_period)
 
