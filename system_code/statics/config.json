@@ -1,0 +1,10 @@
+{
+    "is_live": false,
+    "database": {
+        "host": "8.218.66.43",
+        "user": "default",
+        "password": "!Clickhouse343306",
+        "database": "mc",
+        "port": 9000
+    }
+}

@@ -1,0 +1,4 @@
+clickhouse_driver
+loguru
+python-okx
+sanic
