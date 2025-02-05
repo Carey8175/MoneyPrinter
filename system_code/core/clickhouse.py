@@ -78,9 +78,25 @@ class CKClient:
     def fetch_data(self, inst_id, begin: datetime, end: datetime) -> pd.DataFrame:
         begin_ts = int(begin.timestamp() * 1000)
         end_ts = int(end.timestamp() * 1000)
-        sql = f"select * from candles where ts >= {begin_ts} and ts < {end_ts} and inst_id = '{inst_id}'"
+        sql = f"select * from candles where ts >= {begin_ts} and ts < {end_ts} and inst_id = '{inst_id}' order by ts"
 
         return self.query_dataframe(sql)
+
+    def get_columns(self, table) -> list:
+        """
+        获取指定表的所有列名
+        :param table: 表名
+        :return: 列名列表
+        """
+        sql = f"""
+        SELECT name 
+        FROM system.columns 
+        WHERE table = '{table}' AND database = '{self.client.connection.database}'
+        """
+
+        result = self.execute(sql)
+
+        return [row[0] for row in result] if result else []
 
 
 if __name__ == '__main__':
