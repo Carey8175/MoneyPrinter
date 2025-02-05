@@ -115,47 +115,45 @@ def upload_data_by_range(bar: str, inst_id: str, begin: datetime, end: datetime)
     """
     failed_dates = []
     data = []
-    ck = CKClient()
+    ck = CKClient(database=f'mc_{bar.upper()}')
 
     for day in range((end - begin).days + 1):
         date = begin + timedelta(days=day)
-        if chunk := upload_data_by_day(bar, inst_id, date, insert=False):
-            if chunk is True:
-                continue
-            data.extend(chunk)
-            logger.info(f"[OK] 成功获取 {inst_id} 在 {date.date()} 的数据。当前数据量：{len(data)} 条。")
+        if chunk := upload_data_by_day(bar, inst_id, date, insert=True):
+            pass
+            # logger.info(f"[OK] 成功插入 {inst_id} 在 {date.date()} 的数据。当前数据量：{len(data)} 条。")
         else:
             failed_dates.append(date)
 
-        # 插入数据库
-        if len(data) >= 10000:
-            ck.insert(
-                'candles',
-                data,
-                columns=[
-                    'inst_id', 'ts', 'open', 'high', 'low', 'close',
-                    'vol', 'taker_sell', 'taker_buy', 'open_interest',
-                    'elite_long_short_ratio', 'elite_position_long_short_ratio',
-                    'all_long_short_ratio'
-                ]
-            )
-            logger.info(f"[OK] 成功插入 {inst_id} 在 {date.date()} 的 {len(data)} 条数据。")
+        # # 插入数据库
+        # if len(data) >= 10000:
+        #     ck.insert(
+        #         'candles',
+        #         data,
+        #         columns=[
+        #             'inst_id', 'ts', 'open', 'high', 'low', 'close',
+        #             'vol', 'taker_sell', 'taker_buy', 'open_interest',
+        #             'elite_long_short_ratio', 'elite_position_long_short_ratio',
+        #             'all_long_short_ratio'
+        #         ]
+        #     )
+        #     logger.info(f"[OK] 成功插入 {inst_id} 在 {date.date()} 的 {len(data)} 条数据。")
+        #
+        #     data = []
 
-            data = []
+    # if data:
+    #     ck.insert(
+    #         'candles',
+    #         data,
+    #         columns=[
+    #             'inst_id', 'ts', 'open', 'high', 'low', 'close',
+    #             'vol', 'taker_sell', 'taker_buy', 'open_interest',
+    #             'elite_long_short_ratio', 'elite_position_long_short_ratio',
+    #             'all_long_short_ratio'
+    #         ]
+    #     )
 
-    if data:
-        ck.insert(
-            'candles',
-            data,
-            columns=[
-                'inst_id', 'ts', 'open', 'high', 'low', 'close',
-                'vol', 'taker_sell', 'taker_buy', 'open_interest',
-                'elite_long_short_ratio', 'elite_position_long_short_ratio',
-                'all_long_short_ratio'
-            ]
-        )
-
-        logger.info(f"[OK] 成功插入 {inst_id} 在 {end.date()} 的 {len(data)} 条数据。")
+        # logger.info(f"[OK] 成功插入 {inst_id} 在 {end.date()} 的 {len(data)} 条数据。")
 
     return failed_dates
 

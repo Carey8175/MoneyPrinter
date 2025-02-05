@@ -867,7 +867,7 @@ def get_candles_database(inst_id, date: datetime, bar, proxies=None):
             if current_end <= begin:
                 break
 
-            time.sleep(0.2)  # 避免请求过快
+            time.sleep(0.05)  # 避免请求过快
 
         df = pd.DataFrame(result, columns=columns)
         return df
