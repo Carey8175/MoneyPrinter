@@ -273,7 +273,15 @@ class BBRsiMaOpenClusterPositionModule(OpenPositionModule):
 
         # # ==================== 4. 聚类 ====================
         # # 4.1. 提取特征
-        drop_cols = ['inst_id_x', 'inst_id_y', 'ts', 'open', 'high', 'low', 'close', 'vol', 'taker_sell', 'taker_buy', 'open_interest', 'elite_long_short_ratio', 'elite_position_long_short_ratio', 'all_long_short_ratio']
+        drop_cols = [
+            'inst_id_x', 'inst_id_y', 'ts', 'open', 'high', 'low', 'close',
+            'vol', 'taker_sell', 'taker_buy', 'open_interest',
+            'elite_long_short_ratio', 'elite_position_long_short_ratio',
+            'all_long_short_ratio',
+            'bullCondition', 'bearCondition', 'bullCondition_shift1',
+            'bearCondition_shift1', 'buySignalRaw', 'sellSignalRaw',
+            'buySignal', 'sellSignal'
+        ]
         feature_columns = [col for col in data.columns if col not in drop_cols]
 
         # 确保所有特征列都在 data 中；若没有 volume，可自行去掉或替换

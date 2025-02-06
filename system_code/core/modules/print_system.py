@@ -46,6 +46,7 @@ class PrintSystem:
         holding_groups = self.open_module.open_position(data)
         holding_groups = self.close_module.close_position(holding_groups)
         df = self.backtest.run(holding_groups)
+        print(df.to_string())
         self.backtest.plot_all(save=True, begin=self.begin, end=self.end, inst_id=self.inst_id)
 
 
