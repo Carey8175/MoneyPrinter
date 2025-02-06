@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from system_code.core.clickhouse import CKClient, logger
-from system_code.core.modules.open_module import OpenPositionModule, BBRsiMaOpenPositionModule
-from system_code.core.modules.close_module import ClosePositionModule
+from system_code.core.modules.open_module import OpenPositionModule, BBRsiMaOpenPositionModule, BBRsiMaOpenClusterPositionModule
+from system_code.core.modules.close_module import ClosePositionModule, FixClosePositionModule
 from system_code.core.modules.backtest import Backtest
 
 
@@ -12,7 +12,7 @@ class PrintSystem:
         self.end = end
         self.inst_id = inst_id
 
-        self.open_module = BBRsiMaOpenPositionModule()
+        self.open_module = BBRsiMaOpenClusterPositionModule()
         self.close_module = ClosePositionModule()
         self.backtest = Backtest(bar)
 
@@ -50,10 +50,10 @@ class PrintSystem:
 
 
 if __name__ == '__main__':
-    begin = datetime(2024, 2, 4)
-    end = datetime(2025, 2, 4)
+    begin = datetime(2023, 4, 4)
+    end = datetime(2025, 6, 4)
     inst_id = 'BTC-USDT-SWAP'
-    bar = '15m'
+    bar = '5m'
 
     ps = PrintSystem(bar, inst_id, begin, end)
     print(ps)
