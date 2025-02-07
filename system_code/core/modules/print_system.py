@@ -51,11 +51,10 @@ class PrintSystem:
 
 
 if __name__ == '__main__':
-    begin = datetime(2023, 4, 4)
-    end = datetime(2025, 6, 4)
-    inst_id = 'BTC-USDT-SWAP'
+    begin = datetime(2024, 2, 4)
+    end = datetime(2025, 2, 4)
+    inst_id = 'DOGE-USDT-SWAP'
     bar = '5m'
 
     ps = PrintSystem(bar, inst_id, begin, end)
-    print(ps)
     ps.run()

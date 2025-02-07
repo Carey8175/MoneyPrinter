@@ -280,7 +280,7 @@ class BBRsiMaOpenClusterPositionModule(OpenPositionModule):
             'all_long_short_ratio',
             'bullCondition', 'bearCondition', 'bullCondition_shift1',
             'bearCondition_shift1', 'buySignalRaw', 'sellSignalRaw',
-            'buySignal', 'sellSignal'
+            'buySignal', 'sellSignal', 'longFilter', 'shortFilter'
         ]
         feature_columns = [col for col in data.columns if col not in drop_cols]
 

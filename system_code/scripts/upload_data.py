@@ -12,8 +12,8 @@ instruments = ck_client.get_instruments_info()
 inst_ids = ['BTC-USDT-SWAP', 'DOGE-USDT-SWAP', 'ETH-USDT-SWAP', 'LTC-USDT-SWAP', 'XRP-USDT-SWAP', 'SOL-USDT-SWAP',
             'TRUMP-USDT-SWAP', 'TON-USDT-SWAP', 'BCH-USDT-SWAP']
 
-begin = datetime(2023, 2, 4)
-end = datetime(2024, 2, 5)
+begin = datetime(2021, 2, 4)
+end = datetime(2022, 2, 5)
 bars = ['5m', '15m']
 bars_num = {
     '5m': 288,

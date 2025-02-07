@@ -546,18 +546,12 @@ class Indicators:
         return df
 
     # 波动指数 --------------------------------------------------------------
-    def vol_chg(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        成交量变化
-        """
-        df['vol_chg'] = df['vol'].pct_change()
-        return df
-
-    def avg_vol_chg(self, df: pd.DataFrame, period_list: list=[3,5,10,20]) -> pd.DataFrame:
-        for period in period_list:
-            df[f'avg_vol_chg_{period}'] = df['vol_chg'].rolling(window=period).mean()
-
-
+    # def vol_chg(self, df: pd.DataFrame) -> pd.DataFrame:
+    #     """
+    #     成交量变化
+    #     """
+    #     df['vol_chg'] = df['vol'].pct_change()
+    #     return df
 
     # 交易量指标 --------------------------------------------------------------
     def obv(self, df: pd.DataFrame,period_list: list=[3,5,10,20]) -> pd.DataFrame:
@@ -685,104 +679,6 @@ class Indicators:
 
         return df
 
-    def next_trend(self, df: pd.DataFrame, windows: int = 30) -> pd.DataFrame:
-        """
-        根据过去 `windows` 根 K 线数据，使用线性回归拟合并预测下一根 K 线的趋势值（优化版）。
-
-        Args:
-            df (pd.DataFrame): 包含 K 线数据的 DataFrame，至少包括以下列：
-                - open: 开盘价
-                - high: 最高价
-                - low: 最低价
-                - close: 收盘价
-            windows (int): 使用过去多少根 K 线数据拟合下一根 K 线。
-
-        Returns:
-            pd.DataFrame: 添加了 `next_trend` 列的数据框。
-        """
-        if len(df) < windows:
-            raise ValueError("DataFrame 长度不足以进行回归计算")
-
-        # 时间步矩阵 (固定不变)
-        X = np.arange(windows).reshape(-1, 1)
-        X_mean = X.mean()
-        X_centered = X - X_mean
-        X_norm = np.sum(X_centered ** 2)
-
-        # 初始化趋势值列表
-        trends = []
-
-        # 提取收盘价序列
-        close_prices = df['close'].values
-
-        # 预计算窗口内的均值，避免重复计算
-        rolling_mean = pd.Series(close_prices).rolling(window=windows).mean().values
-
-        for i in range(windows, len(close_prices)):
-            # 提取当前窗口的收盘价
-            y = close_prices[i - windows:i]
-            y_mean = rolling_mean[i - 1]  # 当前窗口内的均值
-
-            # 中心化 y
-            y_centered = y - y_mean
-
-            # 计算斜率和截距
-            slope = np.sum(X_centered.flatten() * y_centered) / X_norm
-            intercept = y_mean - slope * X_mean
-
-            # 预测下一时间步的值
-            next_close = slope * windows + intercept
-
-            # 计算趋势值
-            current_close = close_prices[i]
-            trend = (next_close - current_close) / current_close
-
-            trends.append(trend)
-
-        # 填充趋势数据到 DataFrame
-        df['next_trend'] = [np.nan] * windows + trends  # 前 windows 行没有趋势值，填充 NaN
-
-        return df
-
-    def cci(self, df: pd.DataFrame, period: int = 20) -> pd.DataFrame:
-        """
-        计算商品通道指数 (CCI) 并优化滚动绝对偏差计算。
-        Args:
-            df: 数据框，包含以下列：
-                - high: 最高价
-                - low: 最低价
-                - close: 收盘价
-            period: 计算 CCI 的周期
-
-        Returns:
-            pd.DataFrame: 包含 CCI 指标的数据框
-        """
-        # 计算典型价格
-        df['tp'] = (df['high'] + df['low'] + df['close']) / 3
-
-        # 计算滚动均值（典型价格的均值）
-        rolling_mean = df['tp'].rolling(window=period).mean()
-
-        # 使用 NumPy 向量化计算滚动绝对偏差
-        tp_array = df['tp'].values
-        rolling_mean_array = rolling_mean.values
-
-        # 计算滚动绝对偏差
-        abs_diff = np.abs(tp_array - rolling_mean_array)
-        rolling_md = np.convolve(abs_diff, np.ones(period) / period, mode='valid')
-
-        # 填充滚动绝对偏差到原始 DataFrame
-        df['md'] = np.nan
-        df.loc[period - 1: len(rolling_md) + period - 2, 'md'] = rolling_md
-
-        # 计算 CCI 指标
-        df['cci'] = (df['tp'] - rolling_mean) / (0.015 * df['md'])
-
-        # 删除中间变量
-        df.drop(columns=['tp', 'md'], inplace=True)
-
-        return df
-
     def calculate_atr(self, df, period=14):
         """
         计算 ATR(平均真实波动范围)：
@@ -906,7 +802,7 @@ class Updator:
 
 
 if __name__ == '__main__':
-    begin = datetime(2024, 2, 4)
-    end = datetime(2025, 2, 4)
+    begin = datetime(2022, 2, 4)
+    end = datetime(2024, 2, 4)
     updator = Updator('5m', begin, end)
     updator.start()

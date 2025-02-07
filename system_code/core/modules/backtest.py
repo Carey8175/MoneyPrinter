@@ -16,6 +16,7 @@ class Backtest:
         self.profits_compound = []
         self.profits_fee = []
         self.profits_compound_fee = []
+        self.begin_end = []     # 保存每个holding group的开始和结束时间
 
     def run(self, holding_groups: list[HoldingGroup]) -> pd.DataFrame:
         """
@@ -30,6 +31,7 @@ class Backtest:
         results = []
 
         for idx, holding_group in enumerate(holding_groups):
+            self.begin_end.append((holding_group.begin, holding_group.end))
             # 对每个HoldingGroup对象的HoldingPeriod对象进行排序
             holding_group.holdings = sorted(holding_group.holdings, key=lambda x: x.begin)
 
@@ -288,14 +290,12 @@ class Backtest:
         btc_prices = btc_prices['close'].tolist()
         return btc_prices[-1] / btc_prices[0] - 1
 
-    def plot_single(self, index, inst_id, begin, end, save=False):
+    def plot_single(self, index, inst_id, save=False):
         """
         绘制回测结果图
         Args:
             index: 回测结果的索引
             inst_id: 合约id
-            begin: 开始时间
-            end: 结束时间
             save: 是否保存图片
 
         Return:
@@ -304,6 +304,8 @@ class Backtest:
         if self.results is None:
             logger.error("Please run the backtest first.")
             return
+
+        begin, end = self.begin_end[index]
 
         # some indicators
         final_return = self.results.loc[index, 'final_return']
@@ -347,7 +349,7 @@ class Backtest:
 
         plt.show()
 
-    def plot_all(self, inst_id, begin, end, save=False):
+    def plot_all(self, inst_id, save=False):
         """
         绘制所有回测结果图
         Args:
@@ -367,8 +369,6 @@ class Backtest:
             self.plot_single(
                 index=i,
                 inst_id=inst_id,
-                begin=begin,
-                end=end,
                 save=save
             )
 

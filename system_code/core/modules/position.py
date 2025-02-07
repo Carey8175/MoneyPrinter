@@ -48,6 +48,8 @@ class HoldingPeriod:
             # 只保留end时间前的数据
             end_ts = int(self.end.timestamp() * 1000)
             self.data = self.data[self.data['ts'] < end_ts]
+        else:
+            self.end = datetime.fromtimestamp(self.data['ts'].iloc[-1] / 1000)
 
         self.begin = datetime.fromtimestamp(self.data['ts'].iloc[0] / 1000)
         self.entry_price = self.data['open'].iloc[0]
