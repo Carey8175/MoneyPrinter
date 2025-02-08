@@ -10,7 +10,8 @@ class HoldingPeriod:
             data: pd.DataFrame,
             side: str,
             leverage: float = 1.0,
-            fee_rate: float = 0.0005
+            fee_rate: float = 0.0005,
+            signal_candle_info: list = None
     ):
         """
         初始化持仓类
@@ -29,6 +30,8 @@ class HoldingPeriod:
         self.leverage = leverage
         self.fee_rate = fee_rate  # 手续费费率（可以在平仓时计算）
         self.more_info = {}     # 用于存储额外信息
+        # 用于存储信号出现时的K线信息, 目前的主要用途是做聚类，cols和data的特征一致
+        self.signal_candle_info = [] if signal_candle_info else self.data[0].values.tolist()
 
         # 计算时初始化
         self.final_profit = None  # 最终收益（平仓后计算）
