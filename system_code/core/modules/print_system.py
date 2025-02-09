@@ -51,8 +51,8 @@ class PrintSystem:
 
 
 if __name__ == '__main__':
-    begin = datetime(2024, 2, 4)
-    end = datetime(2025, 2, 4)
+    begin = datetime(2023, 2, 4)
+    end = datetime(2024, 2, 4)
     inst_id = 'DOGE-USDT-SWAP'
     bar = '5m'
 

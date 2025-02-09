@@ -28,6 +28,13 @@ class Backtest:
         Returns:
             pd.DataFrame: 装有回测结果的DataFrame，每一行是一个HoldingGroup对象的回测结果
         """
+        #  现将全部的存储信息清空， 防止多次调用
+        self.profits = []
+        self.profits_compound = []
+        self.profits_fee = []
+        self.profits_compound_fee = []
+        self.begin_end = []
+
         results = []
 
         for idx, holding_group in enumerate(holding_groups):
@@ -223,18 +230,18 @@ class Backtest:
                 'max_overlap': max_overlap,
                 'mean_overlap': mean_overlap,
                 'final_return_compound_fee': final_return_compound_fee,
-                'average_daily_return': average_daily_return,
-                'average_monthly_return': average_monthly_return,
-                'average_yearly_return': average_yearly_return,
-                'average_daily_return_compound': average_daily_return_compound,
-                'average_monthly_return_compound': average_monthly_return_compound,
-                'average_yearly_return_compound': average_yearly_return_compound,
-                'average_daily_return_fee': average_daily_return_fee,
-                'average_monthly_return_fee': average_monthly_return_fee,
-                'average_yearly_return_fee': average_yearly_return_fee,
-                'average_daily_return_compound_fee': average_daily_return_compound_fee,
-                'average_monthly_return_compound_fee': average_monthly_return_compound_fee,
-                'average_yearly_return_compound_fee': average_yearly_return_compound_fee,
+                # 'average_daily_return': average_daily_return,
+                # 'average_monthly_return': average_monthly_return,
+                # 'average_yearly_return': average_yearly_return,
+                # 'average_daily_return_compound': average_daily_return_compound,
+                # 'average_monthly_return_compound': average_monthly_return_compound,
+                # 'average_yearly_return_compound': average_yearly_return_compound,
+                # 'average_daily_return_fee': average_daily_return_fee,
+                # 'average_monthly_return_fee': average_monthly_return_fee,
+                # 'average_yearly_return_fee': average_yearly_return_fee,
+                # 'average_daily_return_compound_fee': average_daily_return_compound_fee,
+                # 'average_monthly_return_compound_fee': average_monthly_return_compound_fee,
+                # 'average_yearly_return_compound_fee': average_yearly_return_compound_fee,
                 'max_drawdown': max_drawdown,
                 'max_drawdown_compound': max_drawdown_compound,
                 'max_drawdown_fee': max_drawdown_fee,
@@ -290,13 +297,14 @@ class Backtest:
         btc_prices = btc_prices['close'].tolist()
         return btc_prices[-1] / btc_prices[0] - 1
 
-    def plot_single(self, index, inst_id, save=False):
+    def plot_single(self, index, inst_id, save=False, to_add_title=''):
         """
         绘制回测结果图
         Args:
             index: 回测结果的索引
             inst_id: 合约id
             save: 是否保存图片
+            to_add_title: 额外标题
 
         Return:
             None
@@ -318,7 +326,7 @@ class Backtest:
         sharpe_ratio_btc_compound = self.results.loc[index, 'sharpe_ratio_btc_compound']
 
         fig, ax = plt.subplots(3, 1, figsize=(12, 20))
-        fig.suptitle(f'Sharp ratio: {sharpe_ratio} | Sharp with Btc: {sharpe_ratio_btc}', fontsize=20)
+        fig.suptitle(f'Sharp ratio: {sharpe_ratio} | {to_add_title}', fontsize=20)
 
         # 1. 固定仓位最终收益率: 固定仓位 带手续费和不带手续费
         ax[0].plot(np.cumsum(self.profits[index]), label='Fixed Position', color='blue')
@@ -345,11 +353,11 @@ class Backtest:
         ax[2].legend()
 
         if save:
-            plt.savefig(f'backtest_{index}.png')
+            plt.savefig(f'backtest_{index}_{to_add_title}.png')
 
         plt.show()
 
-    def plot_all(self, inst_id, save=False):
+    def plot_all(self, inst_id, save=False, to_add_title=''):
         """
         绘制所有回测结果图
         Args:
@@ -357,6 +365,7 @@ class Backtest:
             begin: 开始时间
             end: 结束时间
             save: 是否保存图片
+            to_add_title: 额外标题
 
         Return:
             None
@@ -369,7 +378,8 @@ class Backtest:
             self.plot_single(
                 index=i,
                 inst_id=inst_id,
-                save=save
+                save=save,
+                to_add_title=to_add_title
             )
 
 

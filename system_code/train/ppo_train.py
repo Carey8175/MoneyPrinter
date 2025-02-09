@@ -1,3 +1,4 @@
+import os
 import copy
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -12,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from system_code.core.modules.print_system import PrintSystem
 from system_code.core.modules.position import HoldingPeriod, HoldingGroup
 from stable_baselines3.common.callbacks import BaseCallback
+from system_code.core.config import Config
 
 
 class TrainingLogger(BaseCallback):
@@ -58,13 +60,13 @@ class HoldingPeriodEnv(gym.Env):
             'all_long_short_ratio',
             'bullCondition', 'bearCondition', 'bullCondition_shift1',
             'bearCondition_shift1', 'buySignalRaw', 'sellSignalRaw',
-            'buySignal', 'sellSignal', 'long_filter', 'short_filter'
+            'buySignal', 'sellSignal', 'longFilter', 'shortFilter'
         ]
         self.data = self.data.drop(columns=drop_cols, errors='ignore')
         self.feature_columns = self.data.columns
         # 标准化处理data
-        scaler = StandardScaler()
-        self.data = pd.DataFrame(scaler.fit_transform(self.data), columns=self.data.columns)
+        # scaler = StandardScaler()
+        # self.data = pd.DataFrame(scaler.fit_transform(self.data), columns=self.data.columns)
 
 
         # gym 需要定义 observation_space，用于描述状态维度、范围等
@@ -205,13 +207,27 @@ class HoldingPeriodEnv(gym.Env):
 
 
 class TrainingModule(PrintSystem):
-    def __init__(self, bar: str, inst_id: str, begin: datetime, end: datetime, load_from_local=False, total_timesteps=250000):
-        super().__init__(bar, inst_id, begin, end)
+    def __init__(
+            self,
+            bar: str,
+            inst_id: str,
+            train_begin: datetime,
+            train_end: datetime,
+            test_begin: datetime,
+            test_end: datetime,
+            load_from_local=False,
+            total_timesteps=250000
+    ):
+        super().__init__(bar, inst_id, train_begin, train_end)
         self.load_from_local = load_from_local
         self.total_timesteps = total_timesteps
+        self.test_begin = test_begin
+        self.test_end = test_end
+        self.train_begin = train_begin
+        self.train_end = train_end
 
     @staticmethod
-    def train_model_for_group(holding_group, total_timesteps=250000):
+    def train_model_for_group(holding_group, total_timesteps=200000):
         """
         针对一个HoldingGroup，训练一个RL模型
         :param holding_group: HoldingGroup对象
@@ -254,16 +270,6 @@ class TrainingModule(PrintSystem):
         假设我们已经通过 open_module.open_position(data) 得到了多个HoldingGroup
         然后对每个HoldingGroup单独训练一个RL模型
         """
-        if self.load_from_local:
-            # 从本地加载模型
-            group_models = []
-            for i in range(len(holding_groups)):
-                model = PPO.load(f"./models/{self.inst_id}_ppo_model_group_{i}.zip")
-                group_models.append(model)
-
-            print("从本地加载模型完成")
-            return group_models
-
         # 1. 比如你已经获得了 holding_groups 列表: List[HoldingGroup]
         # 例如:
         # holding_groups = self.open_module.open_position(data)
@@ -277,7 +283,7 @@ class TrainingModule(PrintSystem):
             group_models.append(model)
 
             # 保存模型
-            model.save(f"./models/{self.inst_id}_ppo_model_group_{i}.zip")
+            model.save(os.path.join(Config.MODEL_DIR, f"{self.inst_id}_ppo_model_group_{i}.zip"))
 
         print("训练完成，已生成所有模型")
         return group_models
@@ -292,7 +298,12 @@ class TrainingModule(PrintSystem):
         step_count = 0
         while not done:
             # 1) 获取动作
-            action, _states = model.predict(obs, deterministic=True)
+            try:
+                action, _states = model.predict(obs, deterministic=True)
+            except Exception as e:
+                print(f"Error: {e}")
+                action = 0
+
             # 2) 与环境交互
             obs, reward, done, _, info = env.step(action)
 
@@ -310,42 +321,58 @@ class TrainingModule(PrintSystem):
             self.inference_on_holding_period(model, hp)
 
     def run(self):
+        self.begin = self.test_begin
+        self.end = self.test_end
+
         data = self.fetch_data()
-        holding_groups = self.open_module.open_position(data)
+        test_groups = self.open_module.open_position(data)
 
-        # groups 中的 1/2 用于训练，1/2 用于回测
-        train_groups = [HoldingGroup() for _ in range(len(holding_groups))]
-        test_groups = [HoldingGroup() for _ in range(len(holding_groups))]
-        # 按照时间顺序分配
-        for i, group in enumerate(holding_groups):
-            train_num = len(group) // 2
-            train_groups[i].holdings = group.holdings[:train_num]
-            test_groups[i].holdings = group.holdings[train_num:]
+        if not self.load_from_local:
+            self.begin = self.train_begin
+            self.end = self.train_end
 
-        group_models = self.run_reinforcement_learning_system(train_groups)
+            data = self.fetch_data()
+            train_groups = self.open_module.open_position(data)
 
-        for model, group in zip(group_models, train_groups):
-            self.simulate_close_module(model, group)
-            group.update()
+            group_models = self.run_reinforcement_learning_system(train_groups)
+
+            for model, group in zip(group_models, train_groups):
+                self.simulate_close_module(model, group)
+                group.update()
+
+            df = self.backtest.run(train_groups)
+            print(df.to_string())
+            self.backtest.plot_all(save=True, inst_id=self.inst_id, to_add_title='train')
+        else:
+            group_models = []
+            for i in range(len(test_groups)):
+                model = PPO.load(os.path.join(Config.MODEL_DIR, f"{self.inst_id}_ppo_model_group_{i}.zip"))
+                group_models.append(model)
+
+            print("从本地加载模型，开始测试")
 
         original_test_groups = copy.deepcopy(test_groups)
-        for g in original_test_groups:
-            g.update()
         for model, group in zip(group_models, test_groups):
             self.simulate_close_module(model, group)
             group.update()
 
-        df = self.backtest.run(train_groups + test_groups + original_test_groups)
+        df = self.backtest.run(test_groups + original_test_groups)
         print(df.to_string())
-        self.backtest.plot_all(save=True, inst_id=self.inst_id)
+        self.backtest.plot_all(save=True, inst_id=self.inst_id, to_add_title='test')
 
 
 if __name__ == '__main__':
-    begin = datetime(2021, 4, 4)
-    end = datetime(2021, 6, 4)
+    from datetime import timedelta
+
+
+    time_delta = timedelta(days=365)
+    train_begin = datetime(2023, 1, 4)
+    train_end = datetime(2024, 2, 4)
+    test_begin = train_begin + time_delta
+    test_end = train_end + time_delta
     inst_id = 'DOGE-USDT-SWAP'
     bar = '5m'
 
-    tm = TrainingModule(bar, inst_id, begin, end, load_from_local=True, total_timesteps=200000)
+    tm = TrainingModule(bar, inst_id, train_begin, train_end, test_begin, test_end, load_from_local=False, total_timesteps=5000000)
     tm.run()
 

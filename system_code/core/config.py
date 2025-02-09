@@ -25,6 +25,7 @@ class Config:
     STRATEGIES_CONFIG_PATH = os.path.join(STATICS_PATH, 'strategy_configs')
     CANDLES_PATH = os.path.join(STATICS_PATH, 'candles')
     CACHE_DIR = os.path.join(os.path.expanduser("~"), '.cache_data')  # 定义隐藏文件夹路径
+    MODEL_DIR = os.path.join(STATICS_PATH, 'models')  # 定义模型文件夹路径
 
     def __init__(self):
         self.key = Key()

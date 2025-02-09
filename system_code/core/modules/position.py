@@ -31,7 +31,7 @@ class HoldingPeriod:
         self.fee_rate = fee_rate  # 手续费费率（可以在平仓时计算）
         self.more_info = {}     # 用于存储额外信息
         # 用于存储信号出现时的K线信息, 目前的主要用途是做聚类，cols和data的特征一致
-        self.signal_candle_info = signal_candle_info if signal_candle_info else self.data.iloc[0]
+        self.signal_candle_info = signal_candle_info if isinstance(signal_candle_info, pd.DataFrame) else self.data.iloc[[0]]
 
         # 计算时初始化
         self.final_profit = None  # 最终收益（平仓后计算）

@@ -1,9 +1,12 @@
+import os
+import joblib
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
+from system_code.core.config import Config
 from system_code.core.modules.position import HoldingPeriod, HoldingGroup
 
 
@@ -142,12 +145,12 @@ class BBRsiMaOpenPositionModule(OpenPositionModule):
 
         for idx in buy_signal_indices:
             holding_data = data.iloc[idx+1:idx + max_hold_bars]
-            holding_period = HoldingPeriod(holding_data, side='long', leverage=leverage)
+            holding_period = HoldingPeriod(holding_data, side='long', leverage=leverage, signal_candle_info=data.iloc[[idx]])
             holding_group.add(holding_period)
 
         for idx in sell_signal_indices:
             holding_data = data.iloc[idx+1:idx + max_hold_bars]
-            holding_period = HoldingPeriod(holding_data, side='short', leverage=leverage)
+            holding_period = HoldingPeriod(holding_data, side='short', leverage=leverage, signal_candle_info=data.iloc[[idx]])
             holding_group.add(holding_period)
 
         # 统计、更新持仓组信息
@@ -157,12 +160,22 @@ class BBRsiMaOpenPositionModule(OpenPositionModule):
 
 
 class BBRsiMaOpenClusterPositionModule(OpenPositionModule):
-    def __init__(self):
+    def __init__(self, n_clusters: int = 2, inst_id: str = 'DOGE-USDT-SWAP'):
         super().__init__()
         self.name = 'bb_rsi_ma_open_module'
+        self.model = None
+        self.n_clusters = n_clusters
+        self.inst_id = inst_id
+        self.load_model()
 
-    @staticmethod
+    def load_model(self, name: str = None):
+        if name is None:
+            name = f'kmeans_{self.inst_id}_{self.n_clusters}.pkl'
+
+        self.model = joblib.load(os.path.join(Config.MODEL_DIR, name))
+
     def open_position(
+            self,
             data: pd.DataFrame,
             leverage: float = 1.0,
             lengthBB: int = 20,
@@ -263,12 +276,12 @@ class BBRsiMaOpenClusterPositionModule(OpenPositionModule):
 
         for idx in buy_signal_indices:
             holding_data = data.iloc[idx+1:idx + max_hold_bars]
-            holding_period = HoldingPeriod(holding_data, side='long', leverage=leverage)
+            holding_period = HoldingPeriod(holding_data, side='long', leverage=leverage, signal_candle_info=data.iloc[[idx]])
             all_hp.append((holding_period, idx))
 
         for idx in sell_signal_indices:
             holding_data = data.iloc[idx+1:idx + max_hold_bars]
-            holding_period = HoldingPeriod(holding_data, side='short', leverage=leverage)
+            holding_period = HoldingPeriod(holding_data, side='short', leverage=leverage, signal_candle_info=data.iloc[[idx]])
             all_hp.append((holding_period, idx))
 
         # # ==================== 4. 聚类 ====================
@@ -300,12 +313,11 @@ class BBRsiMaOpenClusterPositionModule(OpenPositionModule):
         # 数据清洗（如缺失值填充）与缩放（可视需要选择）
         # 这里简单做个 fillna(0) + 标准化示例
         X = np.nan_to_num(X, nan=0.0)
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        # scaler = StandardScaler()
+        # X_scaled = scaler.fit_transform(X)
 
         # 4.2. 聚类
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        labels = kmeans.fit_predict(X_scaled)
+        labels = self.model.predict(X)
 
         # 4.3. 按照聚类结果，将 HoldingPeriod 分组
         holding_groups = [HoldingGroup() for _ in range(n_clusters)]
