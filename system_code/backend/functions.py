@@ -20,13 +20,14 @@ def get_instruments_info() -> list:
     return instruments.to_dict(orient='records')
 
 
-def upload_data_by_day(bar: str, inst_id: str, date: datetime, insert=True) -> bool | list:
+def upload_data_by_day(bar: str, inst_id: str, date: datetime, insert=True, end_date=None) -> bool | list:
     """
     上传数据
     :param bar: 周期
     :param inst_id: 合约ID
     :param date: 日期
     :param insert: 是否立即插入数据库
+    :param end_date: 结束日期 (如果是多天的数据，需要传入)
     :return:
     """
     # 定义不同粒度所需的数据条数，用于校验
@@ -65,14 +66,16 @@ def upload_data_by_day(bar: str, inst_id: str, date: datetime, insert=True) -> b
     # 切换到目标数据库，检查当天是否有数据
     ck_client_data = CKClient(database=database)
     has_data = ck_client_data.has_data_for_date(inst_id, date, bar_num[bar])
+    has_data_end = ck_client_data.has_data_for_date(inst_id, end_date, bar_num[bar]) if end_date else True
+    has_data = has_data and has_data_end
     if has_data:
         logger.warning(f"{inst_id} 在 {date.date()} 的数据已经存在，跳过上传。")
         return True
 
     # 数据不存在，则开始获取并插入
     for i in range(3):
-        data = get_candles_database(inst_id, date, bar)
-        if len(data) == bar_num[bar]:
+        data = get_candles_database(inst_id, date, bar, end_date=end_date)
+        if len(data) == bar_num[bar] or (end_date and len(data) == bar_num[bar] * (end_date - date).days):
             # 数据格式转换：CK表结构 ['inst_id', 'ts', 'open', 'high', 'low', 'close', 'vol', ...]
             # 注意：原逻辑是把时间戳放到第一位，然后再加上 inst_id
             data = [[int(d[0])] + d[1:] for d in data]  # 将ts强转int，作为第一列
@@ -104,6 +107,44 @@ def upload_data_by_day(bar: str, inst_id: str, date: datetime, insert=True) -> b
     raise Exception(f"[ERROR] {inst_id} 在 {date.date()} 获取数据条数始终不正确，上传失败。")
 
 
+def get_optimal_day_chunk(bar: str, min_bars=80, max_bars=100) -> int:
+    """
+    根据 bar 和每天的K线数量，计算一次请求的最优天数，以满足：
+      - 返回的总条数 >= min_bars
+      - 返回的总条数 <= max_bars
+    如果单天数据量已经 > max_bars，返回 1（只能一天一天请求，或者进一步的拆分逻辑自行实现）。
+    """
+    bar_num_map = {
+        '1m': 1440,
+        '5m': 288,
+        '15m': 96,
+        '1H': 24,
+        '4H': 6,
+        '1D': 1
+    }
+
+    daily_count = bar_num_map[bar]
+    if daily_count > max_bars:
+        # 单天已经超过接口最大限制，无法多天合并，只能按天处理
+        return 1
+
+    # 理想的 chunk 数量上限（不超过接口限制）
+    max_chunk = max_bars // daily_count  # 整数除法，比如 100//24=4
+
+    # 找到最接近这个 max_chunk 的 chunk，使得 chunk*daily_count >= min_bars
+    # 一般情况下 max_chunk*daily_count 应该就是符合要求的，但假如它小于 min_bars，可再做一次修正
+    if max_chunk * daily_count < min_bars:
+        # 尝试 +1，但要确保不超过接口限制
+        if (max_chunk + 1) * daily_count <= max_bars:
+            max_chunk += 1
+        else:
+            # 实在满足不了，只能用这个 max_chunk
+            pass
+
+    # 保险：至少 1 天
+    return max(max_chunk, 1)
+
+
 def upload_data_by_range(bar: str, inst_id: str, begin: datetime, end: datetime) -> list:
     """
     通过时间范围上传数据
@@ -117,9 +158,13 @@ def upload_data_by_range(bar: str, inst_id: str, begin: datetime, end: datetime)
     data = []
     ck = CKClient(database=f'mc_{bar.upper()}')
 
-    for day in range((end - begin).days + 1):
+    # 拿到最优的 chunk 天数
+    chunk_days = get_optimal_day_chunk(bar)
+
+    for day in range(0, (end - begin).days + 1, chunk_days):
         date = begin + timedelta(days=day)
-        if chunk := upload_data_by_day(bar, inst_id, date, insert=True):
+        end_date = None if chunk_days == 1 else date + timedelta(days=chunk_days)
+        if chunk := upload_data_by_day(bar, inst_id, date, insert=True, end_date=end_date):
             pass
             # logger.info(f"[OK] 成功插入 {inst_id} 在 {date.date()} 的数据。当前数据量：{len(data)} 条。")
         else:

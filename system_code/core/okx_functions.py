@@ -798,7 +798,7 @@ def long_short_account_ratio(inst_id: str, bar='5m', after: int = None, before: 
         return
 
 
-def get_candles_database(inst_id, date: datetime, bar, proxies=None):
+def get_candles_database(inst_id, date: datetime, bar, proxies=None, end_date: datetime =None):
     """
     获取指定日期和时间周期的K线数据，并合并其他交易数据。
 
@@ -807,6 +807,7 @@ def get_candles_database(inst_id, date: datetime, bar, proxies=None):
         date: 日期 (datetime 对象)
         bar: K线周期 ('1m', '5m', '15m', '1h', '4h', '1d')
         proxies: 代理设置
+        end_date: 结束日期 默认为当天
 
     Returns:
         处理后的K线数据（列表格式）
@@ -814,7 +815,7 @@ def get_candles_database(inst_id, date: datetime, bar, proxies=None):
     marketDataAPI = MarketData.MarketAPI(flag="0", debug=False, proxy=proxies)
 
     begin = int(date.timestamp() * 1000) - 1  # 当天 00:00 UTC 时间戳（毫秒）
-    end = begin + 24 * 60 * 60 * 1000  # 当天 23:59:59 UTC 时间戳（毫秒）
+    end = begin + 24 * 60 * 60 * 1000  if not end_date else int(end_date.timestamp() * 1000)# 当天 23:59:59 UTC 时间戳（毫秒）
 
     def fetch_paginated_data(api_function, columns):
         """
