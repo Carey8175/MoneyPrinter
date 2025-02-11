@@ -7,7 +7,7 @@ from system_code.core.modules.backtest import Backtest
 
 
 class PrintSystem:
-    def __init__(self, bar: str, inst_id: str, begin: datetime, end: datetime):
+    def __init__(self, bar: str, begin: datetime, end: datetime, inst_id: str = None):
         self.begin = begin
         self.end = end
         self.inst_id = inst_id
@@ -17,6 +17,8 @@ class PrintSystem:
         self.backtest = Backtest(bar)
 
         self.ck_client = CKClient(database=f'mc_{bar.upper()}')
+        if self.inst_id is None:
+            self.inst_id = self.ck_client.get_instruments_info()['inst_id'].tolist()
 
     def __str__(self):
         info = f"""\n
@@ -28,16 +30,25 @@ class PrintSystem:
 
         return info
 
-    def fetch_data(self):
-        data = self.ck_client.fetch_data(self.inst_id, self.begin, self.end)
-        indicators = self.ck_client.fetch_data(self.inst_id, self.begin, self.end, table='indicators')
-        # sort
-        data = data.sort_values('ts')
-        indicators = indicators.sort_values('ts')
+    def fetch_data(self, indicators=True):
+        results = []
 
-        data = data.merge(indicators, on='ts', how='left')
+        if not isinstance(self.inst_id, list):
+            self.inst_id = [self.inst_id]
 
-        return data
+        for inst_id in self.inst_id:
+            data = self.ck_client.fetch_data(inst_id, self.begin, self.end)
+            if indicators:
+                indicators = self.ck_client.fetch_data(inst_id, self.begin, self.end, table='indicators')
+                # sort
+                data = data.sort_values('ts')
+                indicators = indicators.sort_values('ts')
+
+                data = data.merge(indicators, on='ts', how='left')
+
+            results.append(data)
+
+        return results
 
     def run(self):
         logger.info(f"[Running] {str(self)}")
@@ -47,7 +58,7 @@ class PrintSystem:
         holding_groups = self.close_module.close_position(holding_groups)
         df = self.backtest.run(holding_groups)
         print(df.to_string())
-        self.backtest.plot_all(save=True, begin=self.begin, end=self.end, inst_id=self.inst_id)
+        self.backtest.plot_all(save=True, inst_id=self.inst_id)
 
 
 if __name__ == '__main__':
